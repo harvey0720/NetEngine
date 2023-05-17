@@ -146,10 +146,7 @@ namespace Repository.Extensions
 
                         if (httpContextType != null)
                         {
-                            if (ipAddress == null)
-                            {
-                                ipAddress = httpContextType.GetMethod("GetIpAddress", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, null)!.ToString()!;
-                            }
+                            ipAddress ??= httpContextType.GetMethod("GetIpAddress", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, null)!.ToString()!;
 
                             if (deviceMark == null)
                             {
@@ -201,7 +198,7 @@ namespace Repository.Extensions
 
             var fields = typeof(T).GetProperties();
 
-            var baseTypeNames = new List<string>();
+            List<string> baseTypeNames = new();
             var baseType = original?.GetType().BaseType;
             while (baseType != null)
             {

@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Reflection;
 using System.Security.Cryptography;
 using WebAPI.Filters;
@@ -18,12 +17,13 @@ using WebAPI.Libraries;
 using WebAPI.Libraries.HttpHandler;
 using WebAPI.Models.AppSetting;
 
-namespace WebApi
+namespace WebAPI
 {
     public class Program
     {
         public static void Main(string[] args)
         {
+            ThreadPool.SetMinThreads(128, 1);
 
             EnvironmentHelper.ChangeDirectory(args);
 
@@ -47,8 +47,8 @@ namespace WebApi
 
             builder.Services.AddDbContextPool<Repository.Database.DatabaseContext>(options =>
             {
-                options.UseSqlServer(builder.Configuration.GetConnectionString("dbConnection"));
-            }, 100);
+                options.UseNpgsql(builder.Configuration.GetConnectionString("dbConnection")!);
+            }, 30);
 
 
             #region 基础 Server 配置
@@ -97,11 +97,11 @@ namespace WebApi
             })
             .AddJwtBearer(options =>
             {
-                var jwtSetting = builder.Configuration.GetSection("JWT").Get<JWTSetting>();
+                var jwtSetting = builder.Configuration.GetRequiredSection("JWT").Get<JWTSetting>()!;
                 var issuerSigningKey = ECDsa.Create();
                 issuerSigningKey.ImportSubjectPublicKeyInfo(Convert.FromBase64String(jwtSetting.PublicKey), out int i);
 
-                options.TokenValidationParameters = new TokenValidationParameters
+                options.TokenValidationParameters = new()
                 {
                     ValidIssuer = jwtSetting.Issuer,
                     ValidAudience = jwtSetting.Audience,
@@ -132,7 +132,8 @@ namespace WebApi
                     policy.SetIsOriginAllowed(origin => true)
                        .AllowAnyHeader()
                        .AllowAnyMethod()
-                       .AllowCredentials();
+                       .AllowCredentials()
+                       .SetPreflightMaxAge(TimeSpan.FromSeconds(7200));
                 });
             });
 
@@ -141,10 +142,9 @@ namespace WebApi
             builder.Services.AddControllers().AddJsonOptions(options =>
             {
                 options.JsonSerializerOptions.Converters.Add(new Common.JsonConverter.DateTimeConverter());
-                options.JsonSerializerOptions.Converters.Add(new Common.JsonConverter.DateTimeNullConverter());
                 options.JsonSerializerOptions.Converters.Add(new Common.JsonConverter.DateTimeOffsetConverter());
-                options.JsonSerializerOptions.Converters.Add(new Common.JsonConverter.DateTimeOffsetNullConverter());
                 options.JsonSerializerOptions.Converters.Add(new Common.JsonConverter.LongConverter());
+                options.JsonSerializerOptions.Converters.Add(new Common.JsonConverter.NullableStructConverterFactory());
             });
 
             #endregion
@@ -156,7 +156,7 @@ namespace WebApi
                 options.SwaggerDoc("v1", null);
 
                 var modelPrefix = Assembly.GetEntryAssembly()?.GetName().Name + ".Models.";
-                options.SchemaGeneratorOptions = new SchemaGeneratorOptions { SchemaIdSelector = type => (type.ToString()[(type.ToString().IndexOf("Models.") + 7)..]).Replace(modelPrefix, "").Replace("`1", "").Replace("+", ".") };
+                options.SchemaGeneratorOptions = new() { SchemaIdSelector = type => (type.ToString()[(type.ToString().IndexOf("Models.") + 7)..]).Replace(modelPrefix, "").Replace("`1", "").Replace("+", ".") };
 
                 options.MapType<long>(() => new OpenApiSchema { Type = "string", Format = "long" });
 
@@ -181,7 +181,7 @@ namespace WebApi
                                     Id = "bearerAuth"
                                 }
                             },
-                        new string[] {}
+                        Array.Empty<string>()
                     }
                 });
                 #endregion
@@ -194,9 +194,8 @@ namespace WebApi
             {
                 options.InvalidModelStateResponseFactory = actionContext =>
                 {
-
                     //获取验证失败的模型字段 
-                    var errors = actionContext.ModelState.Where(e => e.Value?.Errors.Count > 0).Select(e => e.Value?.Errors.First().ErrorMessage).ToList();
+                    var errors = actionContext.ModelState.Where(e => e.Value?.Errors.Count > 0).Select(e => e.Key + " : " + e.Value?.Errors.First().ErrorMessage).ToList();
 
                     var dataStr = string.Join(" | ", errors);
 
@@ -212,49 +211,43 @@ namespace WebApi
 
 
             //注册雪花ID算法
-            builder.Services.AddSingleton(new SnowflakeHelper(0, 0));
+            builder.Services.AddSingleton(new IDHelper(0, 0));
 
 
             //注册分布式锁 Redis模式
             builder.Services.AddRedisLock(options =>
             {
-                options.Configuration = builder.Configuration.GetConnectionString("redisConnection");
+                options.Configuration = builder.Configuration.GetConnectionString("redisConnection")!;
                 options.InstanceName = "lock";
             });
 
 
-
-            #region 注册缓存服务
-
-            //注册缓存服务 内存模式
-            builder.Services.AddDistributedMemoryCache();
-
-
             //注册缓存服务 Redis模式
-            //builder.Services.AddStackExchangeRedisCache(options =>
-            //{
-            //    options.Configuration = builder.Configuration.GetConnectionString("redisConnection");
-            //    options.InstanceName = "cache";
-            //});
+            builder.Services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = builder.Configuration.GetConnectionString("redisConnection");
+                options.InstanceName = "cache";
+            });
 
-            #endregion
 
             #region 注册HttpClient
             builder.Services.AddHttpClient("", options =>
             {
-                options.DefaultRequestVersion = new Version("2.0");
+                options.DefaultRequestVersion = new("2.0");
             }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
-                AllowAutoRedirect = false
+                AllowAutoRedirect = false,
+                AutomaticDecompression = System.Net.DecompressionMethods.All
             });
 
 
             builder.Services.AddHttpClient("SkipSsl", options =>
             {
-                options.DefaultRequestVersion = new Version("2.0");
+                options.DefaultRequestVersion = new("2.0");
             }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
                 AllowAutoRedirect = false,
+                AutomaticDecompression = System.Net.DecompressionMethods.All,
                 ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; }
             });
 
@@ -262,7 +255,7 @@ namespace WebApi
             builder.Services.AddTransient<HttpSignHandler>();
             builder.Services.AddHttpClient("HttpSign", options =>
             {
-                options.DefaultRequestVersion = new Version("2.0");
+                options.DefaultRequestVersion = new("2.0");
             }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
                 AllowAutoRedirect = false,
@@ -276,7 +269,7 @@ namespace WebApi
 
             //builder.Services.AddTencentCloudSMS(options =>
             //{
-            //    var settings = builder.Configuration.GetSection("TencentCloudSMS").Get<SMS.TencentCloud.Models.SMSSetting>();
+            //    var settings = builder.Configuration.GetRequiredSection("TencentCloudSMS").Get<SMS.TencentCloud.Models.SMSSetting>()!;
             //    options.AppId = settings.AppId;
             //    options.SecretId = settings.SecretId;
             //    options.SecretKey = settings.SecretKey;
@@ -285,7 +278,7 @@ namespace WebApi
 
             //builder.Services.AddAliCloudSMS(options =>
             //{
-            //    var settings = builder.Configuration.GetSection("AliCloudSMS").Get<SMS.AliCloud.Models.SMSSetting>();
+            //    var settings = builder.Configuration.GetRequiredSection("AliCloudSMS").Get<SMS.AliCloud.Models.SMSSetting>()!;
             //    options.AccessKeyId = settings.AccessKeyId;
             //    options.AccessKeySecret = settings.AccessKeySecret;
             //});
@@ -297,7 +290,7 @@ namespace WebApi
 
             //builder.Services.AddTencentCloudStorage(options =>
             //{
-            //    var settings = builder.Configuration.GetSection("TencentCloudFileStorage").Get<FileStorage.TencentCloud.Models.FileStorageSetting>();
+            //    var settings = builder.Configuration.GetRequiredSection("TencentCloudFileStorage").Get<FileStorage.TencentCloud.Models.FileStorageSetting>()!;
             //    options.AppId = settings.AppId;
             //    options.Region = settings.Region;
             //    options.SecretId = settings.SecretId;
@@ -308,7 +301,7 @@ namespace WebApi
 
             //builder.Services.AddAliCloudStorage(options =>
             //{
-            //    var settings = builder.Configuration.GetSection("AliCloudFileStorage").Get<FileStorage.AliCloud.Models.FileStorageSetting>();
+            //    var settings = builder.Configuration.GetRequiredSection("AliCloudFileStorage").Get<FileStorage.AliCloud.Models.FileStorageSetting>()!;
             //    options.Endpoint = settings.Endpoint;
             //    options.AccessKeyId = settings.AccessKeyId;
             //    options.AccessKeySecret = settings.AccessKeySecret;
@@ -333,8 +326,6 @@ namespace WebApi
 
             app.UseForwardedHeaders();
 
-            app.UseResponseCompression();
-
             //开启倒带模式允许多次读取 HttpContext.Body 中的内容
             app.Use(async (context, next) =>
             {
@@ -345,9 +336,20 @@ namespace WebApi
             if (app.Environment.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
+
+                #region 启用 Swagger
+                app.UseSwagger();
+
+                app.UseSwaggerUI(options =>
+                {
+                    options.SwaggerEndpoint($"/swagger/v1/swagger.json", null);
+                });
+                #endregion
             }
             else
             {
+                app.UseResponseCompression();
+
                 //注册全局异常处理机制
                 app.UseExceptionHandler(builder => builder.Run(async context => await GlobalError.ErrorEvent(context)));
             }
@@ -369,17 +371,11 @@ namespace WebApi
             app.MapControllers();
 
 
-            #region 启用 Swagger
-            app.UseSwagger();
-
-            app.UseSwaggerUI(options =>
-            {
-                options.SwaggerEndpoint($"/swagger/v1/swagger.json", null);
-            });
-            #endregion
-
-
-            app.Run();
+            app.Start();
+#if DEBUG
+            Console.WriteLine(string.Join(Environment.NewLine, app.Urls.Select(t => Environment.NewLine + "Swagger Doc: " + t + "/swagger/" + Environment.NewLine).ToList()));
+#endif
+            app.WaitForShutdown();
         }
 
 

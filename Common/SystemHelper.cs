@@ -52,38 +52,23 @@ namespace Common
         /// <returns></returns>
         public static string LinuxShell(string shell)
         {
-
             string output = "";
 
             //创建一个ProcessStartInfo对象 使用系统shell 指定命令和参数 设置标准输出
-            var psi = new ProcessStartInfo("/bin/bash", "-c \"" + shell + "\"") { RedirectStandardOutput = true };
+            ProcessStartInfo psi = new("/bin/bash", "-c \"" + shell + "\"") { RedirectStandardOutput = true };
 
-
-            //启动
             using (var proc = Process.Start(psi))
             {
-
-                if (proc == null)
+                if (proc != null)
                 {
-                    Console.WriteLine("Can not exec.");
-                }
-                else
-                {
-                    Console.WriteLine("Shell执行：\n" + shell);
-
                     output = proc.StandardOutput.ReadToEnd();
 
                     if (!proc.HasExited)
                     {
                         proc.Kill();
-
-                        Console.WriteLine("Shell已结束,进程已关闭");
                     }
                 }
-
             }
-
-            Console.WriteLine("Shell结果：\n" + output);
 
             return output;
         }
@@ -101,34 +86,20 @@ namespace Common
             string output = "";
 
             //创建一个ProcessStartInfo对象 使用系统shell 指定命令和参数 设置标准输出
-            var psi = new ProcessStartInfo("powershell", "-c \"" + shell + "\"") { RedirectStandardOutput = true };
+            ProcessStartInfo psi = new("powershell", "-c \"" + shell + "\"") { RedirectStandardOutput = true };
 
-
-            //启动
             using (var proc = Process.Start(psi))
             {
-
-                if (proc == null)
+                if (proc != null)
                 {
-                    Console.WriteLine("Can not exec.");
-                }
-                else
-                {
-                    Console.WriteLine("Shell执行：\n" + shell);
-
                     output = proc.StandardOutput.ReadToEnd();
 
                     if (!proc.HasExited)
                     {
                         proc.Kill();
-
-                        Console.WriteLine("Shell已结束,进程已关闭");
                     }
                 }
-
             }
-
-            Console.WriteLine("Shell结果：\n" + output);
 
             return output;
         }
@@ -149,7 +120,7 @@ namespace Common
 
             WindowsShell(shell);
 
-            return System.IO.File.Exists(pdfPath);
+            return File.Exists(pdfPath);
         }
 
 
@@ -167,7 +138,7 @@ namespace Common
 
             WindowsShell(shell);
 
-            return System.IO.File.Exists(pdfPath);
+            return File.Exists(pdfPath);
         }
 
 
@@ -185,7 +156,7 @@ namespace Common
 
             WindowsShell(shell);
 
-            return System.IO.File.Exists(pdfPath);
+            return File.Exists(pdfPath);
         }
 
     }

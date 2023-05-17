@@ -2,8 +2,6 @@
 using Logger.LocalFile.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using System.Timers;
-using Timer = System.Timers.Timer;
 
 namespace Logger.LocalFile.Tasks
 {
@@ -13,69 +11,52 @@ namespace Logger.LocalFile.Tasks
         private readonly int saveDays;
 
 
-        private readonly object locker = new();
-
-
         public LogClearTask(IOptionsMonitor<LoggerSetting> config)
         {
             saveDays = config.CurrentValue.SaveDays;
         }
 
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            return Task.Run(() =>
+            if (saveDays != -1)
             {
-                var timer = new Timer(1000 * 60 * 60 * 24);
-                timer.Elapsed += TimerElapsed;
-                timer.Start();
-            }, stoppingToken);
-        }
-
-
-
-        private void TimerElapsed(object? sender, ElapsedEventArgs e)
-        {
-            try
-            {
-                lock (locker)
+                while (!stoppingToken.IsCancellationRequested)
                 {
-                    Run();
-                }
-            }
-            catch
-            {
-
-            }
-        }
-
-
-        private void Run()
-        {
-
-
-            string basePath = Directory.GetCurrentDirectory().Replace("\\", "/") + "/Logs/";
-
-            if (Directory.Exists(basePath))
-            {
-                List<string> logPaths = IOHelper.GetFolderAllFiles(basePath).ToList();
-
-                var deleteTime = DateTime.UtcNow.AddDays(-1 * saveDays);
-
-                if (logPaths.Count != 0)
-                {
-                    foreach (var logPath in logPaths)
+                    try
                     {
-                        var fileInfo = new FileInfo(logPath);
 
-                        if (fileInfo.CreationTimeUtc < deleteTime)
+                        string basePath = Path.Combine(Directory.GetCurrentDirectory(), "Logs");
+
+                        if (Directory.Exists(basePath))
                         {
-                            File.Delete(logPath);
+                            List<string> logPaths = IOHelper.GetFolderAllFiles(basePath).ToList();
+
+                            var deleteTime = DateTime.UtcNow.AddDays(-1 * saveDays);
+
+                            if (logPaths.Count != 0)
+                            {
+                                foreach (var logPath in logPaths)
+                                {
+                                    FileInfo fileInfo = new(logPath);
+
+                                    if (fileInfo.CreationTimeUtc < deleteTime)
+                                    {
+                                        File.Delete(logPath);
+                                    }
+
+                                }
+                            }
                         }
 
                     }
+                    catch
+                    {
+                    }
 
+                    await Task.Delay(1000 * 60 * 60 * 24, stoppingToken);
                 }
             }
+
 
         }
 

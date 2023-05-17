@@ -260,9 +260,8 @@ namespace WebAPI.Libraries.WeiXin.Public
             //在string后加入API KEY
             str += "&key=" + key;
             //MD5加密
-            var md5 = MD5.Create();
-            var bs = md5.ComputeHash(Encoding.UTF8.GetBytes(str));
-            var sb = new StringBuilder();
+            var bs = MD5.HashData(Encoding.UTF8.GetBytes(str));
+            StringBuilder sb = new();
             foreach (byte b in bs)
             {
                 sb.Append(b.ToString("x2"));

@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 
 namespace WebAPI.Filters
 {
@@ -24,14 +25,14 @@ namespace WebAPI.Filters
         /// <summary>
         /// 是否使用 Token
         /// </summary>
-        public bool UseToken { get; set; }
+        public bool IsUseToken { get; set; }
 
 
         void IActionFilter.OnActionExecuting(ActionExecutingContext context)
         {
             string key = "";
 
-            if (UseToken)
+            if (IsUseToken)
             {
                 var token = context.HttpContext.Request.Headers.Where(t => t.Key == "Authorization").Select(t => t.Value).FirstOrDefault();
 
@@ -47,11 +48,18 @@ namespace WebAPI.Filters
             try
             {
                 var distributedCache = context.HttpContext.RequestServices.GetRequiredService<IDistributedCache>();
-                var cacheInfo = distributedCache.GetObject<object>(key);
+                var cacheInfo = distributedCache.Get<object>(key);
 
                 if (cacheInfo != null)
                 {
-                    context.Result = new ObjectResult(cacheInfo);
+                    if (((JsonElement)cacheInfo).ValueKind == JsonValueKind.String)
+                    {
+                        context.Result = new ObjectResult(cacheInfo.ToString());
+                    }
+                    else
+                    {
+                        context.Result = new ObjectResult(cacheInfo);
+                    }
                 }
             }
             catch (Exception ex)
@@ -70,7 +78,7 @@ namespace WebAPI.Filters
                 {
                     string key = "";
 
-                    if (UseToken)
+                    if (IsUseToken)
                     {
                         var token = context.HttpContext.Request.Headers.Where(t => t.Key == "Authorization").Select(t => t.Value).FirstOrDefault();
 
@@ -86,7 +94,7 @@ namespace WebAPI.Filters
                     if (objectResult.Value != null)
                     {
                         var distributedCache = context.HttpContext.RequestServices.GetRequiredService<IDistributedCache>();
-                        distributedCache.SetObject(key, objectResult.Value, TimeSpan.FromSeconds(TTL));
+                        distributedCache.SetAsync(key, objectResult.Value, TimeSpan.FromSeconds(TTL));
                     }
 
                 }

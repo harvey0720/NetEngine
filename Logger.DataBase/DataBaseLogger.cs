@@ -12,23 +12,25 @@ namespace Logger.DataBase
         private readonly string categoryName;
 
 
-        private readonly SnowflakeHelper snowflakeHelper;
+        private readonly IDHelper idHelper;
 
         private readonly LoggerSetting loggerSetting;
 
 
 
-        public DataBaseLogger(string categoryName, LoggerSetting loggerSetting, SnowflakeHelper snowflakeHelper)
+        public DataBaseLogger(string categoryName, LoggerSetting loggerSetting, IDHelper idHelper)
         {
             this.categoryName = categoryName;
             this.loggerSetting = loggerSetting;
-            this.snowflakeHelper = snowflakeHelper;
+            this.idHelper = idHelper;
         }
 
-        public IDisposable BeginScope<TState>(TState state)
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
         {
-            return default!;
+            return default;
         }
+
 
 
         public bool IsEnabled(LogLevel logLevel)
@@ -76,7 +78,7 @@ namespace Logger.DataBase
 
                         TLog log = new()
                         {
-                            Id = snowflakeHelper.GetId(),
+                            Id = idHelper.GetId(),
                             CreateTime = DateTime.UtcNow,
                             Project = loggerSetting.Project,
                             MachineName = Environment.MachineName,
@@ -89,14 +91,14 @@ namespace Logger.DataBase
                         string logStr = JsonHelper.ObjectToJson(log);
 
 
-                        string basePath = Directory.GetCurrentDirectory().Replace("\\", "/") + "/Logs/";
+                        string basePath = Path.Combine(Directory.GetCurrentDirectory(), "Logs");
 
                         if (Directory.Exists(basePath) == false)
                         {
                             Directory.CreateDirectory(basePath);
                         }
 
-                        var logPath = basePath + log.Id + ".log";
+                        var logPath = Path.Combine(basePath, log.Id + ".log");
 
                         File.WriteAllText(logPath, logStr + Environment.NewLine, Encoding.UTF8);
 

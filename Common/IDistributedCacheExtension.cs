@@ -4,14 +4,15 @@ namespace Common
 {
 
     /// <summary>
-    /// 扩展分布式缓存接口,集成常用方法
+    /// 扩展分布式缓存接口
+    /// </summary>
     /// </summary>
     public static class IDistributedCacheExtension
     {
 
 
         /// <summary>
-        /// 删除指定key
+        /// 删除缓存
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
@@ -30,18 +31,141 @@ namespace Common
 
 
 
+
         /// <summary>
-        /// 设置object类型的key
+        /// 设置 string 类型的缓存
         /// </summary>
         /// <param name="key"></param>
         /// <param name="value"></param>
         /// <returns></returns>
-        public static bool SetObject(this IDistributedCache distributedCache, string key, object value)
+        public static bool Set(this IDistributedCache distributedCache, string key, string value)
+        {
+            try
+            {
+                distributedCache.SetString(key, value);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+
+
+        /// <summary>
+        /// 设置 string 类型的缓存（异步）
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static void SetAsync(this IDistributedCache distributedCache, string key, string value)
+        {
+            Task.Run(() =>
+            {
+                distributedCache.Set(key, value);
+            });
+        }
+
+
+
+        /// <summary>
+        /// 设置 string 类型的缓存
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <param name="absoluteExpirationRelativeToNow">相对过期时间</param>
+        /// <returns></returns>
+        public static bool Set(this IDistributedCache distributedCache, string key, string value, TimeSpan absoluteExpirationRelativeToNow)
+        {
+            try
+            {
+                distributedCache.SetString(key, value, new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = absoluteExpirationRelativeToNow });
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+
+
+        /// <summary>
+        /// 设置 string 类型的缓存（异步）
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <param name="absoluteExpirationRelativeToNow">相对过期时间</param>
+        /// <returns></returns>
+        public static void SetAsync(this IDistributedCache distributedCache, string key, string value, TimeSpan absoluteExpirationRelativeToNow)
+        {
+            Task.Run(() =>
+            {
+                distributedCache.Set(key, value, absoluteExpirationRelativeToNow);
+            });
+        }
+
+
+
+
+        /// <summary>
+        /// 设置 string 类型的缓存
+        /// </summary>
+        /// <param name="key">键</param>
+        /// <param name="value">值</param>
+        /// <param name="absoluteExpiration">绝对过期时间</param>
+        /// <returns></returns>
+        public static bool Set(this IDistributedCache distributedCache, string key, string value, DateTimeOffset absoluteExpiration)
+        {
+            try
+            {
+                distributedCache.SetString(key, value, new DistributedCacheEntryOptions { AbsoluteExpiration = absoluteExpiration });
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+
+
+        /// <summary>
+        /// 设置 string 类型的缓存（异步）
+        /// </summary>
+        /// <param name="key">键</param>
+        /// <param name="value">值</param>
+        /// <param name="absoluteExpiration">绝对过期时间</param>
+        /// <returns></returns>
+        public static void SetAsync(this IDistributedCache distributedCache, string key, string value, DateTimeOffset absoluteExpiration)
+        {
+            Task.Run(() =>
+            {
+                distributedCache.Set(key, value, absoluteExpiration);
+            });
+        }
+
+
+
+
+        /// <summary>
+        /// 设置 object 类型的缓存
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static bool Set(this IDistributedCache distributedCache, string key, object value)
         {
             try
             {
                 var valueStr = JsonHelper.ObjectToJson(value);
-                distributedCache.SetString(key, valueStr);
+
+                if (valueStr != "[]")
+                {
+                    distributedCache.SetString(key, valueStr);
+                }
+
                 return true;
             }
             catch
@@ -53,40 +177,39 @@ namespace Common
 
 
         /// <summary>
-        /// 设置string类型key,包含有效时间
+        /// 设置 object 类型的缓存（异步）
         /// </summary>
         /// <param name="key"></param>
         /// <param name="value"></param>
-        /// <param name="timeOut"></param>
         /// <returns></returns>
-        public static bool SetString(this IDistributedCache distributedCache, string key, string value, TimeSpan timeOut)
+        public static void SetAsync(this IDistributedCache distributedCache, string key, object value)
         {
-            try
+            Task.Run(() =>
             {
-                distributedCache.SetString(key, value, new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = timeOut });
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+                distributedCache.Set(key, value);
+            });
         }
 
 
 
         /// <summary>
-        /// 设置object类型key,包含有效时间
+        /// 设置 object 类型的缓存
         /// </summary>
         /// <param name="key"></param>
         /// <param name="value"></param>
-        /// <param name="timeOut"></param>
+        /// <param name="absoluteExpirationRelativeToNow">相对过期时间</param>
         /// <returns></returns>
-        public static bool SetObject(this IDistributedCache distributedCache, string key, object value, TimeSpan timeOut)
+        public static bool Set(this IDistributedCache distributedCache, string key, object value, TimeSpan absoluteExpirationRelativeToNow)
         {
             try
             {
                 var valueStr = JsonHelper.ObjectToJson(value);
-                distributedCache.SetString(key, valueStr, new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = timeOut });
+
+                if (valueStr != "[]")
+                {
+                    distributedCache.SetString(key, valueStr, new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = absoluteExpirationRelativeToNow });
+                }
+
                 return true;
             }
             catch
@@ -97,31 +220,101 @@ namespace Common
 
 
 
+        /// <summary>
+        /// 设置 object 类型的缓存（异步）
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <param name="absoluteExpirationRelativeToNow">相对过期时间</param>
+        /// <returns></returns>
+        public static void SetAsync(this IDistributedCache distributedCache, string key, object value, TimeSpan absoluteExpirationRelativeToNow)
+        {
+            Task.Run(() =>
+            {
+                distributedCache.Set(key, value, absoluteExpirationRelativeToNow);
+            });
+        }
+
+
 
         /// <summary>
-        /// 读取 Object 类型的key
+        /// 设置 object 类型的缓存
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <param name="absoluteExpiration">绝对过期时间</param>
+        /// <returns></returns>
+        public static bool Set(this IDistributedCache distributedCache, string key, object value, DateTimeOffset absoluteExpiration)
+        {
+            try
+            {
+                var valueStr = JsonHelper.ObjectToJson(value);
+
+                if (valueStr != "[]")
+                {
+                    distributedCache.SetString(key, valueStr, new DistributedCacheEntryOptions { AbsoluteExpiration = absoluteExpiration });
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+
+
+        /// <summary>
+        /// 设置 object 类型的缓存（异步）
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <param name="absoluteExpiration">绝对过期时间</param>
+        /// <returns></returns>
+        public static void SetAsync(this IDistributedCache distributedCache, string key, object value, DateTimeOffset absoluteExpiration)
+        {
+            Task.Run(() =>
+            {
+                distributedCache.Set(key, value, absoluteExpiration);
+            });
+        }
+
+
+
+
+        /// <summary>
+        /// 获取 Object 类型的缓存
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="key"></param>
         /// <returns></returns>
-        public static T GetObject<T>(this IDistributedCache distributedCache, string key)
+        public static T? Get<T>(this IDistributedCache distributedCache, string key)
         {
             try
             {
                 var valueStr = distributedCache.GetString(key);
-                var value = JsonHelper.JsonToObject<T>(valueStr);
-                return value;
+
+                if (valueStr != null)
+                {
+                    var value = JsonHelper.JsonToObject<T>(valueStr);
+                    return value;
+                }
+                else
+                {
+                    return default;
+                }
             }
             catch
             {
-                return default!;
+                return default;
             }
         }
 
 
 
         /// <summary>
-        /// 判断是否存在指定key
+        /// 判断缓存是否存在
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>

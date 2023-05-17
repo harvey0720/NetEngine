@@ -11,6 +11,7 @@ namespace Common
     /// <summary>
     /// 针对string字符串常用操作方法
     /// </summary>
+#pragma warning disable SYSLIB1045 // Convert to 'GeneratedRegexAttribute'.
     public class StringHelper
     {
 
@@ -62,6 +63,30 @@ namespace Common
             {
                 return false;
             }
+        }
+
+
+
+        /// <summary>
+        /// 判断字符串中是否全部为中文
+        /// </summary>
+        /// <param name="text"></param>
+        /// <returns></returns>
+        public static bool IsAllCN(string text)
+        {
+            for (int i = 0; i < text.Length; i++)
+            {
+                string t = text.Substring(i, 1);
+
+                var isCN = IsContainsCN(t);
+
+                if (isCN == false)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
 
@@ -340,7 +365,7 @@ namespace Common
                 {
                     byte[] base64 = Convert.FromBase64String(encoded);
 
-                    result = new Guid(base64);
+                    result = new(base64);
                 }
                 catch (FormatException)
                 {

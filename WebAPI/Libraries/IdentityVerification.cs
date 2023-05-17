@@ -35,25 +35,24 @@ namespace WebAPI.Libraries
 
                     IssueNewToken(httpContext);
 
-                    var module = "webapi";
+                    var module = typeof(Program).Assembly.GetName().Name!;
 
                     Endpoint endpoint = httpContext.GetEndpoint()!;
 
                     ControllerActionDescriptor actionDescriptor = endpoint.Metadata.GetMetadata<ControllerActionDescriptor>()!;
 
-                    var controller = actionDescriptor.ControllerName.ToLower();
-                    var action = actionDescriptor.ActionName.ToLower();
+                    var route = actionDescriptor.AttributeRouteInfo?.Template;
 
                     using var db = httpContext.RequestServices.GetRequiredService<DatabaseContext>();
 
-                    var userId = long.Parse(httpContext.GetClaimByAuthorization("userId")!);
-                    var roleIds = db.TUserRole.Where(t => t.IsDelete == false && t.UserId == userId).Select(t => t.RoleId).ToList();
-
-                    var functionId = db.TFunctionAction.Where(t => t.IsDelete == false && t.Module.ToLower() == module && t.Controller.ToLower() == controller && t.Action.ToLower() == action).Select(t => t.FunctionId).FirstOrDefault();
+                    var functionId = db.TFunctionRoute.Where(t => t.Module == module && t.Route == route).Select(t => t.FunctionId).FirstOrDefault();
 
                     if (functionId != default)
                     {
-                        var functionAuthorizeId = db.TFunctionAuthorize.Where(t => t.IsDelete == false && t.FunctionId == functionId && (roleIds.Contains(t.RoleId!.Value) || t.UserId == userId)).Select(t => t.Id).FirstOrDefault();
+                        var userId = long.Parse(httpContext.GetClaimByAuthorization("userId")!);
+                        var roleIds = db.TUserRole.Where(t => t.UserId == userId).Select(t => t.RoleId).ToList();
+
+                        var functionAuthorizeId = db.TFunctionAuthorize.Where(t => t.FunctionId == functionId && (roleIds.Contains(t.RoleId!.Value) || t.UserId == userId)).Select(t => t.Id).FirstOrDefault();
 
                         if (functionAuthorizeId != default)
                         {
@@ -78,7 +77,6 @@ namespace WebAPI.Libraries
                 return false;
             }
 
-
         }
 
 
@@ -90,7 +88,7 @@ namespace WebAPI.Libraries
         private static void IssueNewToken(HttpContext httpContext)
         {
 
-            var snowflakeHelper = httpContext.RequestServices.GetRequiredService<SnowflakeHelper>();
+            var idHelper = httpContext.RequestServices.GetRequiredService<IDHelper>();
 
             var db = httpContext.RequestServices.GetRequiredService<DatabaseContext>();
 
@@ -112,7 +110,7 @@ namespace WebAPI.Libraries
                 var distLock = httpContext.RequestServices.GetRequiredService<IDistributedLock>();
                 if (distLock.TryLock(key) != null)
                 {
-                    var newToken = db.TUserToken.Where(t => t.IsDelete == false && t.LastId == tokenId && t.CreateTime > nbfTime).FirstOrDefault();
+                    var newToken = db.TUserToken.Where(t => t.LastId == tokenId && t.CreateTime > nbfTime).FirstOrDefault();
 
                     if (newToken == null)
                     {
@@ -123,7 +121,7 @@ namespace WebAPI.Libraries
 
                             TUserToken userToken = new()
                             {
-                                Id = snowflakeHelper.GetId(),
+                                Id = idHelper.GetId(),
                                 UserId = userId,
                                 LastId = tokenId,
                                 CreateTime = DateTime.UtcNow
@@ -135,12 +133,12 @@ namespace WebAPI.Libraries
                                 };
 
                             var configuration = httpContext.RequestServices.GetRequiredService<IConfiguration>();
-                            var jwtSetting = configuration.GetSection("JWT").Get<JWTSetting>();
+                            var jwtSetting = configuration.GetRequiredSection("JWT").Get<JWTSetting>()!;
 
                             var jwtPrivateKey = ECDsa.Create();
                             jwtPrivateKey.ImportECPrivateKey(Convert.FromBase64String(jwtSetting.PrivateKey), out _);
-                            var creds = new SigningCredentials(new ECDsaSecurityKey(jwtPrivateKey), SecurityAlgorithms.EcdsaSha256);
-                            var jwtSecurityToken = new JwtSecurityToken(jwtSetting.Issuer, jwtSetting.Audience, claims, DateTime.UtcNow, DateTime.UtcNow + jwtSetting.Expiry, creds);
+                            SigningCredentials creds = new(new ECDsaSecurityKey(jwtPrivateKey), SecurityAlgorithms.EcdsaSha256);
+                            JwtSecurityToken jwtSecurityToken = new(jwtSetting.Issuer, jwtSetting.Audience, claims, DateTime.UtcNow, DateTime.UtcNow + jwtSetting.Expiry, creds);
 
                             var token = new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
 

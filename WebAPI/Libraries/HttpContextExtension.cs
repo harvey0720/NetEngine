@@ -34,17 +34,17 @@ namespace WebAPI.Libraries
         /// <returns></returns>
         public static string? GetClaimByAuthorization(this HttpContext httpContext, string key)
         {
-            try
-            {
-                var authorization = httpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+            var authorization = httpContext.Request.Headers["Authorization"].FirstOrDefault()?.Replace("Bearer ", "");
 
-                var securityToken = new JwtSecurityToken(authorization);
+            if (authorization != null)
+            {
+                JwtSecurityToken securityToken = new(authorization);
 
                 var value = securityToken.Claims.ToList().Where(t => t.Type == key).FirstOrDefault()?.Value;
 
                 return value;
             }
-            catch
+            else
             {
                 return null;
             }
@@ -110,7 +110,7 @@ namespace WebAPI.Libraries
 
                 requestBody.Position = 0;
 
-                using var requestReader = new StreamReader(requestBody);
+                using StreamReader requestReader = new(requestBody);
                 requestContent = requestReader.ReadToEnd();
             }
 
@@ -127,7 +127,7 @@ namespace WebAPI.Libraries
 
             var context = httpContext;
 
-            var parameters = new List<DtoKeyValue>();
+            List<DtoKeyValue> parameters = new();
 
             if (context.Request.Method == "POST")
             {
@@ -158,6 +158,20 @@ namespace WebAPI.Libraries
             }
 
             return parameters;
+        }
+
+
+
+
+        /// <summary>
+        /// 设置错误消息
+        /// </summary>
+        /// <param name="httpContext"></param>
+        /// <param name="errMsg"></param>
+        public static void SetErrMsg(this HttpContext httpContext, string errMsg)
+        {
+            httpContext.Response.StatusCode = 400;
+            httpContext.Items.Add("errMsg", errMsg);
         }
 
     }

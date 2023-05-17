@@ -8,20 +8,18 @@ namespace AdminShared.Models.User
     public class DtoEditUser
     {
 
+        /// <summary>
+        /// 名称
+        /// </summary>
+        [Required(ErrorMessage = "名称不可以空")]
+        public string Name { get; set; }
 
 
         /// <summary>
         /// 用户名
         /// </summary>
         [Required(ErrorMessage = "用户名不可以空")]
-        public string Name { get; set; }
-
-
-        /// <summary>
-        /// 昵称
-        /// </summary>
-        [Required(ErrorMessage = "昵称不可以空")]
-        public string NickName { get; set; }
+        public string UserName { get; set; }
 
 
         /// <summary>
@@ -42,6 +40,13 @@ namespace AdminShared.Models.User
         /// </summary>
         [Required(ErrorMessage = "密码不可以为空")]
         public string PassWord { get; set; }
+
+
+
+        /// <summary>
+        /// 角色ID集合
+        /// </summary>
+        public string[] RoleIds { get; set; }
 
     }
 }

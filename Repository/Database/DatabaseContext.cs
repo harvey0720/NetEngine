@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Repository.Bases;
 using System.ComponentModel;
 using System.Reflection;
 using System.Xml;
@@ -14,83 +15,90 @@ namespace Repository.Database
 
         #region 表实体声明
 
-        public DbSet<TAppSetting> TAppSetting => Set<TAppSetting>();
+        public DbSet<TAppSetting> TAppSetting { get; set; }
 
 
-        public DbSet<TArticle> TArticle => Set<TArticle>();
+        public DbSet<TArticle> TArticle { get; set; }
 
 
-        public DbSet<TCategory> TCategory => Set<TCategory>();
-
-
-        public DbSet<TChannel> TChannel => Set<TChannel>();
+        public DbSet<TCategory> TCategory { get; set; }
 
 
 
-        public DbSet<TDataUpdateLog> TDataUpdateLog => Set<TDataUpdateLog>();
+        public DbSet<TDataUpdateLog> TDataUpdateLog { get; set; }
 
 
 
-        public DbSet<TFile> TFile => Set<TFile>();
+        public DbSet<TFile> TFile { get; set; }
 
 
-        public DbSet<TFunction> TFunction => Set<TFunction>();
+        public DbSet<TFunction> TFunction { get; set; }
 
 
-        public DbSet<TFunctionAction> TFunctionAction => Set<TFunctionAction>();
+        public DbSet<TFunctionAuthorize> TFunctionAuthorize { get; set; }
 
 
-        public DbSet<TFunctionAuthorize> TFunctionAuthorize => Set<TFunctionAuthorize>();
+        public DbSet<TFunctionRoute> TFunctionRoute { get; set; }
 
 
-        public DbSet<TLink> TLink => Set<TLink>();
+        public DbSet<TLink> TLink { get; set; }
 
 
-        public DbSet<TLog> TLog => Set<TLog>();
+        public DbSet<TLog> TLog { get; set; }
 
 
-        public DbSet<TOrder> TOrder => Set<TOrder>();
+        public DbSet<TOrder> TOrder { get; set; }
 
 
-        public DbSet<TOrderDetail> TOrderDetail => Set<TOrderDetail>();
+        public DbSet<TOrderDetail> TOrderDetail { get; set; }
 
 
-        public DbSet<TProduct> TProduct => Set<TProduct>();
+        public DbSet<TProduct> TProduct { get; set; }
 
 
-        public DbSet<TRegionArea> TRegionArea => Set<TRegionArea>();
+        public DbSet<TQueueTask> TQueueTask { get; set; }
 
 
-        public DbSet<TRegionCity> TRegionCity => Set<TRegionCity>();
+        public DbSet<TRegionArea> TRegionArea { get; set; }
 
 
-        public DbSet<TRegionProvince> TRegionProvince => Set<TRegionProvince>();
+        public DbSet<TRegionCity> TRegionCity { get; set; }
 
 
-        public DbSet<TRegionTown> TRegionTown => Set<TRegionTown>();
+        public DbSet<TRegionProvince> TRegionProvince { get; set; }
 
 
-        public DbSet<TRole> TRole => Set<TRole>();
+        public DbSet<TRegionTown> TRegionTown { get; set; }
 
 
-        public DbSet<TUser> TUser => Set<TUser>();
+        public DbSet<TRole> TRole { get; set; }
 
 
-        public DbSet<TUserBindExternal> TUserBindExternal => Set<TUserBindExternal>();
+        public DbSet<TUser> TUser { get; set; }
 
 
-        public DbSet<TUserInfo> TUserInfo => Set<TUserInfo>();
+        public DbSet<TUserBindExternal> TUserBindExternal { get; set; }
 
 
-        public DbSet<TUserRole> TUserRole => Set<TUserRole>();
+        public DbSet<TUserInfo> TUserInfo { get; set; }
 
 
-        public DbSet<TUserToken> TUserToken => Set<TUserToken>();
+        public DbSet<TUserRole> TUserRole { get; set; }
+
+
+        public DbSet<TUserToken> TUserToken { get; set; }
 
 
         #endregion
 
 
+        private static void GlobalHasQueryFilter<T>(ModelBuilder builder) where T : CD
+        {
+            builder.Entity<T>().HasQueryFilter(e => e.IsDelete == false);
+        }
+
+
+        private static readonly MethodInfo globalHasQueryFilter = typeof(DatabaseContext).GetMethod("GlobalHasQueryFilter", BindingFlags.Static | BindingFlags.NonPublic)!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -101,16 +109,14 @@ namespace Repository.Database
                 foreignKey.DeleteBehavior = DeleteBehavior.Restrict;
             }
 
-
             foreach (var entity in modelBuilder.Model.GetEntityTypes())
             {
+
+                //添加全局过滤器
+                globalHasQueryFilter.MakeGenericMethod(entity.ClrType).Invoke(null, new object[] { modelBuilder });
+
                 modelBuilder.Entity(entity.Name, builder =>
                 {
-
-                    //开启 PostgreSQL 全库行并发乐观锁
-                    //builder.UseXminAsConcurrencyToken();
-
-
                     //设置生成数据库时的表名移除前缀T
                     var tableName = builder.Metadata.ClrType.CustomAttributes.Where(t => t.AttributeType.Name == "TableAttribute").Select(t => t.ConstructorArguments.Select(c => c.Value?.ToString()).FirstOrDefault()).FirstOrDefault() ?? (entity.ClrType.Name[1..]);
                     builder.ToTable(tableName);
@@ -118,9 +124,9 @@ namespace Repository.Database
 
 #if DEBUG
                     //设置表的备注
-                    builder.HasComment(GetEntityComment(entity.Name));
+                    builder.ToTable(t => t.HasComment(GetEntityComment(entity.Name)));
 
-                    var baseTypeNames = new List<string>();
+                    List<string> baseTypeNames = new();
                     var baseType = entity.ClrType.BaseType;
                     while (baseType != null)
                     {
@@ -162,13 +168,12 @@ namespace Repository.Database
 
         public static string GetEntityComment(string typeName, string? fieldName = null, List<string>? baseTypeNames = null)
         {
-            var path = AppContext.BaseDirectory + "/Repository.xml";
-            var xml = new XmlDocument();
+            var path = Path.Combine(AppContext.BaseDirectory, "Repository.xml");
+            XmlDocument xml = new();
             xml.Load(path);
             XmlNodeList memebers = xml.SelectNodes("/doc/members/member")!;
 
-            var fieldList = new Dictionary<string, string>();
-
+            Dictionary<string, string> fieldList = new();
 
             if (fieldName == null)
             {
@@ -207,10 +212,7 @@ namespace Repository.Database
                         {
                             name = name.Replace(matchKey, "");
 
-                            if (fieldList.ContainsKey(name))
-                            {
-                                fieldList.Remove(name);
-                            }
+                            fieldList.Remove(name);
 
                             fieldList.Add(name, summary);
                         }
@@ -237,24 +239,6 @@ namespace Repository.Database
                 return fieldList.FirstOrDefault(t => t.Key.ToLower() == fieldName.ToLower()).Value ?? fieldName;
             }
         }
-
-
-
-
-        ///// <summary>
-        ///// 通用的RowVersion重写保存方法
-        ///// </summary>
-        ///// <returns></returns>
-        //public override int SaveChanges()
-        //{
-        //    DatabaseContext db = this;
-        //    var list = db.ChangeTracker.Entries().Where(t => t.State == EntityState.Modified).ToList();
-        //    foreach (var item in list)
-        //    {
-        //        item.Entity.GetType().GetProperty("RowVersion")?.SetValue(item.Entity, Guid.NewGuid());
-        //    }
-        //    return base.SaveChanges();
-        //}
 
 
     }

@@ -9,6 +9,8 @@ namespace TaskService
     {
         static void Main(string[] args)
         {
+            ThreadPool.SetMinThreads(128, 1);
+
             EnvironmentHelper.ChangeDirectory(args);
 
             IHost host = Host.CreateDefaultBuilder(args).UseWindowsService()
@@ -17,8 +19,8 @@ namespace TaskService
 
                     services.AddDbContextPool<Repository.Database.DatabaseContext>(options =>
                     {
-                        options.UseSqlServer(hostContext.Configuration.GetConnectionString("dbConnection"));
-                    }, 100);
+                        options.UseNpgsql(hostContext.Configuration.GetConnectionString("dbConnection")!);
+                    }, 30);
 
 
                     services.BatchRegisterServices();
@@ -27,7 +29,7 @@ namespace TaskService
 
                     //services.AddTencentCloudSMS(options =>
                     //{
-                    //    var settings = hostContext.Configuration.GetSection("TencentCloudSMS").Get<SMS.TencentCloud.Models.SMSSetting>();
+                    //    var settings = hostContext.Configuration.GetRequiredSection("TencentCloudSMS").Get<SMS.TencentCloud.Models.SMSSetting>()!;
                     //    options.AppId = settings.AppId;
                     //    options.SecretId = settings.SecretId;
                     //    options.SecretKey = settings.SecretKey;
@@ -36,7 +38,7 @@ namespace TaskService
 
                     //services.AddAliCloudSMS(options =>
                     //{
-                    //    var settings = hostContext.Configuration.GetSection("AliCloudSMS").Get<SMS.AliCloud.Models.SMSSetting>();
+                    //    var settings = hostContext.Configuration.GetRequiredSection("AliCloudSMS").Get<SMS.AliCloud.Models.SMSSetting>()!;
                     //    options.AccessKeyId = settings.AccessKeyId;
                     //    options.AccessKeySecret = settings.AccessKeySecret;
                     //});
@@ -47,7 +49,7 @@ namespace TaskService
 
                     //services.AddTencentCloudStorage(options =>
                     //{
-                    //    var settings = hostContext.Configuration.GetSection("TencentCloudFileStorage").Get<FileStorage.TencentCloud.Models.FileStorageSetting>();
+                    //    var settings = hostContext.Configuration.GetRequiredSection("TencentCloudFileStorage").Get<FileStorage.TencentCloud.Models.FileStorageSetting>()!;
                     //    options.AppId = settings.AppId;
                     //    options.Region = settings.Region;
                     //    options.SecretId = settings.SecretId;
@@ -58,7 +60,7 @@ namespace TaskService
 
                     //services.AddAliCloudStorage(options =>
                     //{
-                    //    var settings = hostContext.Configuration.GetSection("AliCloudFileStorage").Get<FileStorage.AliCloud.Models.FileStorageSetting>();
+                    //    var settings = hostContext.Configuration.GetRequiredSection("AliCloudFileStorage").Get<FileStorage.AliCloud.Models.FileStorageSetting>()!;
                     //    options.Endpoint = settings.Endpoint;
                     //    options.AccessKeyId = settings.AccessKeyId;
                     //    options.AccessKeySecret = settings.AccessKeySecret;
@@ -69,50 +71,44 @@ namespace TaskService
 
 
                     //注册雪花ID算法
-                    services.AddSingleton(new SnowflakeHelper(0, 0));
+                    services.AddSingleton(new IDHelper(0, 0));
 
 
                     //注册分布式锁 Redis模式
                     services.AddRedisLock(options =>
                     {
-                        options.Configuration = hostContext.Configuration.GetConnectionString("redisConnection");
+                        options.Configuration = hostContext.Configuration.GetConnectionString("redisConnection")!;
                         options.InstanceName = "lock";
                     });
 
 
-                    #region 注册缓存服务
-
-                    //注册缓存服务 内存模式
-                    services.AddDistributedMemoryCache();
-
-
-
                     //注册缓存服务 Redis模式
-                    //services.AddStackExchangeRedisCache(options =>
-                    //{
-                    //    options.Configuration = hostContext.Configuration.GetConnectionString("redisConnection");
-                    //    options.InstanceName = "cache";
-                    //});
+                    services.AddStackExchangeRedisCache(options =>
+                    {
+                        options.Configuration = hostContext.Configuration.GetConnectionString("redisConnection");
+                        options.InstanceName = "cache";
+                    });
 
-                    #endregion
 
                     #region 注册HttpClient
 
                     services.AddHttpClient("", options =>
                     {
-                        options.DefaultRequestVersion = new Version("2.0");
+                        options.DefaultRequestVersion = new("2.0");
                     }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
                     {
-                        AllowAutoRedirect = false
+                        AllowAutoRedirect = false,
+                        AutomaticDecompression = System.Net.DecompressionMethods.All
                     });
 
 
                     services.AddHttpClient("SkipSsl", options =>
                     {
-                        options.DefaultRequestVersion = new Version("2.0");
+                        options.DefaultRequestVersion = new("2.0");
                     }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
                     {
                         AllowAutoRedirect = false,
+                        AutomaticDecompression = System.Net.DecompressionMethods.All,
                         ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; }
                     });
 

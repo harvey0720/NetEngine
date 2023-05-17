@@ -16,15 +16,15 @@ namespace WebAPI.Controllers
 
 
         private readonly DatabaseContext db;
-        private readonly SnowflakeHelper snowflakeHelper;
+        private readonly IDHelper idHelper;
         private readonly IDistributedCache distributedCache;
 
 
 
-        public BaseController(DatabaseContext db, SnowflakeHelper snowflakeHelper, IDistributedCache distributedCache)
+        public BaseController(DatabaseContext db, IDHelper idHelper, IDistributedCache distributedCache)
         {
             this.db = db;
-            this.snowflakeHelper = snowflakeHelper;
+            this.idHelper = idHelper;
             this.distributedCache = distributedCache;
         }
 
@@ -40,8 +40,7 @@ namespace WebAPI.Controllers
         [HttpGet("GetRegion")]
         public List<DtoKeyValue> GetRegion(int provinceId, int cityId)
         {
-
-            var list = new List<DtoKeyValue>();
+            List<DtoKeyValue> list = new();
 
             if (provinceId == 0 && cityId == 0)
             {
@@ -121,7 +120,7 @@ namespace WebAPI.Controllers
 
             var image = ImgHelper.GetVerifyCode(text);
 
-            distributedCache.SetString(cacheKey, text, TimeSpan.FromMinutes(5));
+            distributedCache.Set(cacheKey, text, TimeSpan.FromMinutes(5));
 
             return File(image, "image/png");
         }
@@ -137,7 +136,7 @@ namespace WebAPI.Controllers
         public List<DtoKeyValue> GetValueList(long groupId)
         {
 
-            var list = db.TAppSetting.Where(t => t.IsDelete == false && t.Module == "Dictionary" && t.GroupId == groupId).Select(t => new DtoKeyValue
+            var list = db.TAppSetting.Where(t => t.Module == "Dictionary" && t.GroupId == groupId).Select(t => new DtoKeyValue
             {
                 Key = t.Key,
                 Value = t.Value
@@ -155,7 +154,7 @@ namespace WebAPI.Controllers
         [HttpGet("GetSnowflakeId")]
         public long GetSnowflakeId()
         {
-            return snowflakeHelper.GetId();
+            return idHelper.GetId();
         }
 
 

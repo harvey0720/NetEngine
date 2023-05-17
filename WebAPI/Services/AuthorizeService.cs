@@ -14,14 +14,14 @@ namespace WebAPI.Services
     {
 
         private readonly DatabaseContext db;
-        private readonly SnowflakeHelper snowflakeHelper;
+        private readonly IDHelper idHelper;
         private readonly IConfiguration configuration;
 
 
-        public AuthorizeService(DatabaseContext db, SnowflakeHelper snowflakeHelper, IConfiguration configuration)
+        public AuthorizeService(DatabaseContext db, IDHelper idHelper, IConfiguration configuration)
         {
             this.db = db;
-            this.snowflakeHelper = snowflakeHelper;
+            this.idHelper = idHelper;
             this.configuration = configuration;
         }
 
@@ -35,7 +35,7 @@ namespace WebAPI.Services
         {
             TUserToken userToken = new()
             {
-                Id = snowflakeHelper.GetId(),
+                Id = idHelper.GetId(),
                 UserId = userId,
                 CreateTime = DateTime.UtcNow
             };
@@ -49,12 +49,12 @@ namespace WebAPI.Services
                 new Claim("userId",userId.ToString())
             };
 
-            var jwtSetting = configuration.GetSection("JWT").Get<JWTSetting>();
+            var jwtSetting = configuration.GetRequiredSection("JWT").Get<JWTSetting>()!;
 
             var jwtPrivateKey = ECDsa.Create();
             jwtPrivateKey.ImportECPrivateKey(Convert.FromBase64String(jwtSetting.PrivateKey), out _);
-            var creds = new SigningCredentials(new ECDsaSecurityKey(jwtPrivateKey), SecurityAlgorithms.EcdsaSha256);
-            var jwtSecurityToken = new JwtSecurityToken(jwtSetting.Issuer, jwtSetting.Audience, claims, DateTime.UtcNow, DateTime.UtcNow + jwtSetting.Expiry, creds);
+            SigningCredentials creds = new(new ECDsaSecurityKey(jwtPrivateKey), SecurityAlgorithms.EcdsaSha256);
+            JwtSecurityToken jwtSecurityToken = new(jwtSetting.Issuer, jwtSetting.Audience, claims, DateTime.UtcNow, DateTime.UtcNow + jwtSetting.Expiry, creds);
 
             return new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
         }

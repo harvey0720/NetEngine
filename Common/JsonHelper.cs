@@ -8,6 +8,37 @@ namespace Common
     public class JsonHelper
     {
 
+        private static JsonSerializerOptions objectToJsonOptions;
+
+        private static JsonSerializerOptions jsonToObjectOptions;
+
+
+        static JsonHelper()
+        {
+            objectToJsonOptions = new()
+            {
+                //关闭默认转义
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+
+                //启用驼峰格式
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+            objectToJsonOptions.Converters.Add(new DateTimeConverter());
+            objectToJsonOptions.Converters.Add(new DateTimeOffsetConverter());
+            objectToJsonOptions.Converters.Add(new LongConverter());
+
+
+            jsonToObjectOptions = new()
+            {
+                //启用大小写不敏感
+                PropertyNameCaseInsensitive = true
+            };
+            jsonToObjectOptions.Converters.Add(new DateTimeConverter());
+            jsonToObjectOptions.Converters.Add(new DateTimeOffsetConverter());
+            jsonToObjectOptions.Converters.Add(new LongConverter());
+        }
+
+
 
         /// <summary>
         /// 通过 Key 获取 Value
@@ -15,10 +46,17 @@ namespace Common
         /// <returns></returns>
         public static string? GetValueByKey(string json, string key)
         {
-            using JsonDocument doc = JsonDocument.Parse(json);
-            var jsonElement = doc.RootElement.Clone();
+            try
+            {
+                using JsonDocument doc = JsonDocument.Parse(json);
+                var jsonElement = doc.RootElement.Clone();
 
-            return jsonElement.GetProperty(key).GetString();
+                return jsonElement.GetProperty(key).GetString();
+            }
+            catch
+            {
+                return null;
+            }
         }
 
 
@@ -30,25 +68,8 @@ namespace Common
         /// <returns>JSON格式的字符串</returns> 
         public static string ObjectToJson(object obj)
         {
-            JsonSerializerOptions options = new();
-            options.Converters.Add(new DateTimeConverter());
-            options.Converters.Add(new DateTimeNullConverter());
-            options.Converters.Add(new DateTimeOffsetConverter());
-            options.Converters.Add(new DateTimeOffsetNullConverter());
-            options.Converters.Add(new LongConverter());
-
-            //关闭默认转义
-            options.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
-
-            //启用驼峰格式
-            options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-
-            //关闭缩进设置
-            options.WriteIndented = false;
-
-            return JsonSerializer.Serialize(obj, options);
+            return JsonSerializer.Serialize(obj, objectToJsonOptions);
         }
-
 
 
 
@@ -60,19 +81,8 @@ namespace Common
         /// <returns>指定类型的对象</returns> 
         public static T JsonToObject<T>(string json)
         {
-            JsonSerializerOptions options = new();
-            options.Converters.Add(new DateTimeConverter());
-            options.Converters.Add(new DateTimeNullConverter());
-            options.Converters.Add(new DateTimeOffsetConverter());
-            options.Converters.Add(new DateTimeOffsetNullConverter());
-            options.Converters.Add(new LongConverter());
-
-            //启用大小写不敏感
-            options.PropertyNameCaseInsensitive = true;
-
-            return JsonSerializer.Deserialize<T>(json, options)!;
+            return JsonSerializer.Deserialize<T>(json, jsonToObjectOptions)!;
         }
-
 
 
 
@@ -87,7 +97,6 @@ namespace Common
 
             return jsonNode;
         }
-
 
     }
 }

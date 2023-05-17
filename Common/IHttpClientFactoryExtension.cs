@@ -1,5 +1,4 @@
-﻿using System.Net.Http.Headers;
-using System.Text;
+﻿using System.Text;
 
 namespace Common
 {
@@ -66,11 +65,11 @@ namespace Common
 
             if (type == "json")
             {
-                content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+                content.Headers.ContentType = new("application/json");
             }
             else if (type == "xml")
             {
-                content.Headers.ContentType = new MediaTypeHeaderValue("text/xml");
+                content.Headers.ContentType = new("text/xml");
             }
 
             content.Headers.ContentType!.CharSet = "utf-8";
@@ -118,9 +117,9 @@ namespace Common
         /// <param name="headers">自定义Header集合</param>
         /// <param name="httpClientName">httpClient名称</param>
         /// <returns></returns>
-        public static async void PostAsync(this IHttpClientFactory httpClientFactory, string url, string data, string type, Dictionary<string, string>? headers = default, string? httpClientName = "")
+        public static void PostAsync(this IHttpClientFactory httpClientFactory, string url, string data, string type, Dictionary<string, string>? headers = default, string? httpClientName = "")
         {
-            await Task.Run(() =>
+            Task.Run(() =>
             {
                 Post(httpClientFactory, url, data, type, headers, httpClientName);
             });

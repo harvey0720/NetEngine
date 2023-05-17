@@ -1,8 +1,8 @@
 ﻿using Common;
 using DistributedLock;
 using Repository.Database;
-using System.Timers;
-using Timer = System.Timers.Timer;
+using TaskService.Libraries.QueueTask;
+using TaskService.Libraries.ScheduleTask;
 
 namespace TaskService.Tasks
 {
@@ -10,42 +10,52 @@ namespace TaskService.Tasks
     {
 
         private readonly IServiceProvider serviceProvider;
+        private readonly ILogger logger;
+        private readonly IDHelper idHelper;
 
-        public DemoTask(IServiceProvider serviceProvider)
+
+        public DemoTask(IServiceProvider serviceProvider, ILogger<DemoTask> logger, IDHelper idHelper)
         {
             this.serviceProvider = serviceProvider;
+            this.logger = logger;
+            this.idHelper = idHelper;
         }
 
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            return Task.Run(() =>
+            ScheduleTaskBuilder.Builder(this);
+            QueueTaskBuilder.Builder(this);
+
+            await Task.Delay(-1, stoppingToken);
+        }
+
+
+
+        [ScheduleTask(Cron = "0/1 * * * * ?")]
+        public void ShowTime()
+        {
+            try
             {
-                var timer = new Timer(1000 * 1);
-                timer.Elapsed += TimerElapsed;
-                timer.Start();
-            }, stoppingToken);
+                using var scope = serviceProvider.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
+                var distLock = scope.ServiceProvider.GetRequiredService<IDistributedLock>();
+
+                Console.WriteLine(DateTime.Now);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "DemoTask.WriteHello");
+            }
         }
 
 
-
-        private void TimerElapsed(object? sender, ElapsedEventArgs e)
+        [QueueTask(Name = "ShowName", Semaphore = 1)]
+        public void ShowName(string name)
         {
-            Run();
+            Console.WriteLine(DateTime.Now + "姓名：" + name);
         }
 
-
-        private void Run()
-        {
-            var snowflakeHelper = serviceProvider.GetRequiredService<SnowflakeHelper>();
-            var logger = serviceProvider.GetRequiredService<ILogger<DemoTask>>();
-
-            using var scope = serviceProvider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
-            var distLock = scope.ServiceProvider.GetRequiredService<IDistributedLock>();
-
-            logger.LogInformation("HelloWord{Id}", snowflakeHelper.GetId());
-
-        }
 
     }
 }
